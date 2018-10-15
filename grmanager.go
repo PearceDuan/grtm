@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
+	"time"
 )
 
 type GrManager struct {
@@ -22,6 +23,57 @@ func (gm *GrManager) StopLoopGoroutine(name string) error {
 	}
 	gm.grchannelMap.grchannels[name].msg <- STOP + strconv.Itoa(int(stopChannel.gid))
 	return nil
+}
+
+
+func (gm *GrManager) UpdateLoopGoroutine(name string, fc interface{}, args ...interface{}) {
+	stopChannel, ok := gm.grchannelMap.grchannels[name]
+	if !ok {
+		fmt.Printf("not found goroutine name: %s, and just start a new goroutine!\n", name)
+	}else {
+		gm.grchannelMap.grchannels[name].msg <- STOP + strconv.Itoa(int(stopChannel.gid))
+		//check unregister success
+		for i := 0; i < 1000; i++ {
+			time.Sleep(1*time.Millisecond)
+			_, ok := gm.grchannelMap.grchannels[name]
+			if !ok {
+				break
+			}
+		}
+	}
+	go func(this *GrManager, n string, fc interface{}, args ...interface{}) {
+		//register channel
+		err := this.grchannelMap.register(n)
+		if err != nil {
+			return
+		}
+		for {
+			select {
+			case info := <-this.grchannelMap.grchannels[name].msg:
+				taskInfo := strings.Split(info, ":")
+				signal, gid := taskInfo[0], taskInfo[1]
+				if gid == strconv.Itoa(int(this.grchannelMap.grchannels[name].gid)) {
+					if signal == "__P" {
+						fmt.Println("gid[" + gid + "] quit")
+						this.grchannelMap.unregister(name)
+						return
+					} else {
+						fmt.Println("unknown signal")
+					}
+				}
+			default:
+				//fmt.Println("no signal")
+			}
+
+			if len(args) > 1 {
+				fc.(func(...interface{}))(args)
+			} else if len(args) == 1 {
+				fc.(func(interface{}))(args[0])
+			} else {
+				fc.(func())()
+			}
+		}
+	}(gm, name, fc, args...)
 }
 
 func (gm *GrManager) NewLoopGoroutine(name string, fc interface{}, args ...interface{}) {
