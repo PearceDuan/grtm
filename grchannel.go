@@ -36,7 +36,7 @@ func (m *GoroutineChannelMap) register(name string) error {
 		gid:  uint64(rand.Int63()),
 		name: name,
 	}
-	gchannel.msg = make(chan string)
+	gchannel.msg = make(chan string, 100)
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	if m.grchannels == nil {
