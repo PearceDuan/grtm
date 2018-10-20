@@ -14,6 +14,7 @@ type GoroutineChannel struct {
 	gid  uint64
 	name string
 	msg  chan string
+	fcmsg chan interface{}
 }
 
 type GoroutineChannelMap struct {
@@ -37,6 +38,7 @@ func (m *GoroutineChannelMap) register(name string) error {
 		name: name,
 	}
 	gchannel.msg = make(chan string, 100)
+	gchannel.fcmsg = make(chan interface{}, 100)
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 	if m.grchannels == nil {
